@@ -1,0 +1,31 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.swp
+*.swo
+
+# Virtual environment
+venv/
+env/
+.env
+.venv/
+
+# Secrets & config
+.env
+.env.local
+*.secret
+
+# Logs
+*.log
+logs/
+nohup.out
+
+# Data files (can contain sensitive info)
+api/users.json
+api/database.json
+
+# Misc
+api/2
+*.crx

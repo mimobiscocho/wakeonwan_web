@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>Dashboard – Gestion des machines</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    /* Styles personnalisés */
+    #notification {
+      display: none;
+      position: fixed;
+      top: 1rem;
+      right: 1rem;
+      padding: 0.75rem 1.25rem;
+      border-radius: 0.5rem;
+      font-weight: 600;
+      z-index: 50;
+    }
+    .success {
+      background-color: #D1FAE5; /* vert clair */
+      color: #065F46;            /* vert foncé */
+    }
+    .error {
+      background-color: #FEE2E2; /* rouge clair */
+      color: #991B1B;            /* rouge foncé */
+    }
+  </style>
+</head>
+<body class="bg-gray-100 text-gray-800">
+  <div id="notification"></div>
+  <header class="bg-white shadow mb-6">
+    <div class="max-w-7xl mx-auto flex items-center justify-between py-6 px-4">
+      <h1 class="text-3xl font-bold">Gestion des machines</h1>
+      <div class="flex space-x-2">
+        <button id="refreshBtn" class="bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-4 rounded">Actualiser</button>
+        <a href="/logout" class="bg-gray-600 hover:bg-gray-700 text-white font-semibold py-2 px-4 rounded">Se déconnecter</a>
+      </div>
+    </div>
+  </header>
+
+  <section class="max-w-3xl mx-auto bg-white p-6 rounded-lg shadow mb-6">
+    <h2 class="text-2xl font-semibold mb-4">Ajouter une machine</h2>
+    <form id="addForm" class="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <input id="name" type="text" placeholder="Nom" required class="border border-gray-300 rounded px-3 py-2"/>
+      <input id="ip" type="text" placeholder="Adresse IP" required class="border border-gray-300 rounded px-3 py-2"/>
+      <input id="mac" type="text" placeholder="Adresse MAC" required class="border border-gray-300 rounded px-3 py-2"/>
+      <input id="port" type="number" placeholder="Port (ex : 5000)" required class="border border-gray-300 rounded px-3 py-2"/>
+      <button type="submit" class="md:col-span-4 bg-green-500 hover:bg-green-600 text-white font-semibold py-2 rounded">Ajouter la machine</button>
+    </form>
+  </section>
+
+  <main class="max-w-7xl mx-auto px-4 mb-12">
+    <div id="cardsContainer"
+    class="flex flex-wrap justify-center gap-6">
+</div>
+
+  </main>
+
+  <section id="userSection" class="max-w-4xl mx-auto bg-white p-6 rounded-lg shadow mb-12 hidden">
+    <h2 class="text-2xl font-semibold mb-4">Gestion des utilisateurs</h2>
+    <form id="addUserForm" class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+      <input id="newUsername" type="text" placeholder="Nom utilisateur" required class="border rounded px-3 py-2"/>
+      <input id="newPassword" type="password" placeholder="Mot de passe" required class="border rounded px-3 py-2"/>
+      <select id="newRole" required class="border rounded px-3 py-2">
+        <option value="">Rôle</option>
+        <option value="admin">Admin</option>
+        <option value="manager">Manager</option>
+        <option value="viewer">Viewer</option>
+      </select>
+      <button type="submit" class="bg-indigo-500 hover:bg-indigo-600 text-white font-semibold py-2 rounded">Ajouter utilisateur</button>
+    </form>
+    <div class="flex items-center space-x-4 mb-4">
+      <input id="userSearch" type="text" placeholder="Rechercher…" 
+             class="border rounded px-3 py-2 flex-1"/>
+      <select id="roleFilter" class="border rounded px-3 py-2">
+        <option value="">Tous rôles</option>
+        <option value="admin">Admin</option>
+        <option value="manager">Manager</option>
+        <option value="viewer">Viewer</option>
+      </select>
+    </div>
+    
+    <table class="w-full text-left border-collapse">
+      <thead>
+        <tr class="bg-gray-200">
+          <th class="p-2">Utilisateur</th>
+          <th class="p-2">Rôle</th>
+          <th class="p-2">Actions</th>
+        </tr>
+      </thead>
+      <tbody id="usersTableBody"></tbody>
+    </table>
+  </section>
+
+  <script>
+    let currentUser = {}, allowedMachines = [];
+
+    function showNotification(message, type) {
+      const n = document.getElementById('notification');
+      n.textContent = message;
+      n.className = type;
+      n.style.display = 'block';
+      setTimeout(() => n.style.display = 'none', 3000);
+    }
+
+    async function fetchMe() {
+      const r = await fetch('/me');
+      if (r.ok) {
+        const d = await r.json();
+        currentUser = d;
+        allowedMachines = d.machines;
+      }
+    }
+
+    async function loadMachines() {
+      const r = await fetch('/machines');
+      if (!r.ok) {
+        showNotification('Erreur machines', 'error');
+        return;
+      }
+      const machines = await r.json();
+      const container = document.getElementById('cardsContainer');
+      container.innerHTML = '';
+
+      machines.forEach((m, i) => {
+        if (currentUser.role === 'admin'
+            || allowedMachines.length === 0
+            || allowedMachines.includes(i)) {
+
+          const p = m.port || 5000;
+          const card = document.createElement('div');
+          // dans votre JS, quand vous créez la card :
+          card.className = 'bg-white rounded-lg shadow-lg p-6 flex flex-col w-full max-w-sm';
+          card.innerHTML = `
+            <h3 class="text-xl font-semibold mb-1">${m.name}</h3>
+            <p class="text-sm text-gray-500 mb-2">IP : ${m.ip}:${p}</p>
+            <p class="mb-4">Statut :
+              <span class="${m.online ? 'text-green-600' : 'text-red-600'} font-semibold">
+                ${m.online ? 'En ligne' : 'Hors ligne'}
+              </span>
+            </p>
+            <div class="mt-auto space-y-2">
+              <button onclick="action(${i},'on')"      class="w-full bg-green-500 hover:bg-green-600 text-white py-2 rounded">Allumer</button>
+              <button onclick="action(${i},'sleep')"   class="w-full bg-yellow-500 hover:bg-yellow-600 text-white py-2 rounded">Veille</button>
+              <button onclick="action(${i},'off')"     class="w-full bg-red-500 hover:bg-red-600 text-white py-2 rounded">Éteindre</button>
+              <button onclick="action(${i},'restart')" class="w-full bg-blue-500 hover:bg-blue-600 text-white py-2 rounded">Redémarrer</button>
+              ${ currentUser.role === 'admin'
+                ? `<button onclick="deleteMachine(${i})" class="w-full bg-gray-500 hover:bg-gray-600 text-white py-2 rounded mt-2">Supprimer</button>`
+                : '' }
+            </div>`;
+          container.appendChild(card);
+        }
+      });
+    }
+
+    async function action(id, cmd) {
+      const machinesResp = await fetch('/machines');
+      const port = machinesResp.ok
+        ? (await machinesResp.json())[id].port || 5000
+        : 5000;
+      const r = await fetch(`/machine/${id}/${cmd}`, { method: 'POST' });
+      if (r.ok) {
+        const d = await r.json();
+        showNotification(d.status, 'success');
+        loadMachines();
+      } else {
+        showNotification('Erreur commande', 'error');
+      }
+    }
+
+    async function deleteMachine(id) {
+      const r = await fetch(`/machine/${id}`, { method: 'DELETE' });
+      if (r.ok) {
+        showNotification((await r.json()).status, 'success');
+        loadMachines();
+      } else {
+        showNotification('Erreur suppression', 'error');
+      }
+    }
+
+    document.getElementById('addForm').addEventListener('submit', async e => {
+      e.preventDefault();
+      const n   = document.getElementById('name').value.trim();
+      const i   = document.getElementById('ip').value.trim();
+      const mac = document.getElementById('mac').value.trim();
+      const port = document.getElementById('port').value.trim();
+      const r = await fetch('/machines', {
+        method: 'POST',
+        headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({name:n,ip:i,mac,port})
+      });
+      if (r.ok) {
+        showNotification((await r.json()).status, 'success');
+        e.target.reset();
+        loadMachines();
+      } else {
+        showNotification('Erreur ajout', 'error');
+      }
+    });
+
+    async function loadUsers() {
+      const r = await fetch('/users');
+      if (!r.ok) return;
+      document.getElementById('userSection').classList.remove('hidden');
+      const users = await r.json();
+      const tbody = document.getElementById('usersTableBody');
+      tbody.innerHTML = '';
+      users.forEach(u => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td class="border p-2">${u.username}</td>
+          <td class="border p-2">${u.role}</td>
+          <td class="border p-2 space-x-2">
+            <button onclick="deleteUser('${u.username}')" class="bg-red-500 hover:bg-red-600 text-white px-2 py-1 rounded">Supprimer</button>
+            <select onchange="changeRole('${u.username}',this.value)" class="border rounded px-2 py-1">
+              <option value="">Changer rôle</option>
+              <option value="admin">Admin</option>
+              <option value="manager">Manager</option>
+              <option value="viewer">Viewer</option>
+            </select>
+          </td>`;
+        tbody.appendChild(tr);
+      });
+    }
+
+    async function deleteUser(u) {
+      const r = await fetch(`/user/${u}`, { method: 'DELETE' });
+      if (r.ok) {
+        showNotification((await r.json()).status, 'success');
+        loadUsers();
+      } else {
+        showNotification('Erreur user', 'error');
+      }
+    }
+
+    async function changeRole(u, r) {
+      if (!r) return;
+      const resp = await fetch(`/user/${u}/role`, {
+        method: 'PUT',
+        headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({role:r})
+      });
+      if (resp.ok) {
+        showNotification((await resp.json()).status, 'success');
+        loadUsers();
+      } else {
+        showNotification('Erreur role', 'error');
+      }
+    }
+    
+
+
+
+
+
+    document.getElementById('addUserForm').addEventListener('submit', async e => {
+      e.preventDefault();
+      const u = document.getElementById('newUsername').value.trim();
+      const p = document.getElementById('newPassword').value.trim();
+      const r = document.getElementById('newRole').value;
+      const resp = await fetch('/user', {
+        method: 'POST',
+        headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({username:u,password:p,role:r,machines:[]})
+      });
+      if (resp.ok) {
+        showNotification((await resp.json()).status, 'success');
+        e.target.reset();
+        loadUsers();
+      } else {
+        showNotification('Erreur user', 'error');
+      }
+    });
+
+    (async () => {
+      await fetchMe();
+      loadMachines();
+      loadUsers();
+      document.getElementById('refreshBtn').addEventListener('click', loadMachines);
+    })();
+
+    
+  </script>
+</body>
+</html>

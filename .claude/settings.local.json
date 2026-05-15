@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git init *)",
+      "Bash(git add *)",
+      "Bash(git -C /home/mimo/Documents/machine-control-project branch -m main)",
+      "Bash(git -C /home/mimo/Documents/machine-control-project status)",
+      "Bash(git commit -m ' *)",
+      "Bash(git config *)"
+    ]
+  }
+}
